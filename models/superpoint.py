@@ -92,6 +92,39 @@ def sample_descriptors(keypoints, descriptors, s: int = 8):
     return descriptors
 
 
+def adapt_conv_weight_channels(pretrained_weight, new_in_channels):
+    """Adapt pretrained conv weight to match new input channel count.
+    
+    Args:
+        pretrained_weight: Tensor of shape (out_channels, in_channels, H, W)
+        new_in_channels: Target number of input channels
+        
+    Returns:
+        Adapted weight tensor of shape (out_channels, new_in_channels, H, W)
+    """
+    out_channels, in_channels, h, w = pretrained_weight.shape
+    
+    if in_channels == new_in_channels:
+        return pretrained_weight
+    
+    if new_in_channels < in_channels:
+        # Crop to match new channels
+        return pretrained_weight[:, :new_in_channels, :, :]
+    else:
+        # Expand channels by averaging and repeating
+        # For RGB (3 channels) from grayscale (1 channel), repeat the weights
+        if in_channels == 1:
+            # Replicate the single channel weights across all new channels
+            # and scale by 1/new_in_channels to preserve magnitude
+            adapted = pretrained_weight.repeat(1, new_in_channels, 1, 1) / new_in_channels
+            return adapted
+        else:
+            # For other cases, repeat pattern and take what we need
+            repeat_factor = (new_in_channels + in_channels - 1) // in_channels
+            adapted = pretrained_weight.repeat(1, repeat_factor, 1, 1)
+            return adapted[:, :new_in_channels, :, :]
+
+
 class SuperPoint(nn.Module):
     """SuperPoint Convolutional Detector and Descriptor
 
@@ -106,6 +139,7 @@ class SuperPoint(nn.Module):
         'keypoint_threshold': 0.005,
         'max_keypoints': -1,
         'remove_borders': 4,
+        'in_channels': 1,  # Default to 1 for grayscale (pretrained model)
     }
 
     def __init__(self, config):
@@ -115,8 +149,9 @@ class SuperPoint(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         c1, c2, c3, c4, c5 = 64, 64, 128, 128, 256
-
-        self.conv1a = nn.Conv2d(1, c1, kernel_size=3, stride=1, padding=1)
+        
+        in_channels = self.config['in_channels']
+        self.conv1a = nn.Conv2d(in_channels, c1, kernel_size=3, stride=1, padding=1)
         self.conv1b = nn.Conv2d(c1, c1, kernel_size=3, stride=1, padding=1)
         self.conv2a = nn.Conv2d(c1, c2, kernel_size=3, stride=1, padding=1)
         self.conv2b = nn.Conv2d(c2, c2, kernel_size=3, stride=1, padding=1)
@@ -133,15 +168,43 @@ class SuperPoint(nn.Module):
             c5, self.config['descriptor_dim'],
             kernel_size=1, stride=1, padding=0)
 
-        path = Path(__file__).parent / 'weights/superpoint_v1.pth'
-        self.load_state_dict(torch.load(str(path)))
+        # Load pretrained weights if requested and available
+        if self.config.get('load_pretrained', True):
+            path = Path(__file__).parent / 'weights/superpoint_v1.pth'
+            if path.exists():
+                self._load_pretrained_weights(path)
+            else:
+                print('Warning: Pretrained weights not found at', path)
 
         mk = self.config['max_keypoints']
         if mk == 0 or mk < -1:
             raise ValueError('\"max_keypoints\" must be positive or \"-1\"')
 
-        print('Loaded SuperPoint model')
+        print('Loaded SuperPoint model (in_channels={})'.format(self.config['in_channels']))
 
+    def _load_pretrained_weights(self, path):
+        """Load pretrained weights, adapting first conv layer if needed."""
+        state_dict = torch.load(str(path))
+        
+        # Check if first conv layer needs adaptation
+        if 'conv1a.weight' in state_dict:
+            pretrained_weight = state_dict['conv1a.weight']
+            _, pretrained_in_ch, _, _ = pretrained_weight.shape
+            current_in_ch = self.config['in_channels']
+            
+            if pretrained_in_ch != current_in_ch:
+                print(f'Adapting conv1a weights from {pretrained_in_ch} to {current_in_ch} channels')
+                state_dict['conv1a.weight'] = adapt_conv_weight_channels(
+                    pretrained_weight, current_in_ch)
+        
+        # Load with strict=False to allow for adapted weights
+        missing_keys, unexpected_keys = self.load_state_dict(state_dict, strict=False)
+        
+        if missing_keys:
+            print(f'Missing keys when loading pretrained weights: {missing_keys}')
+        if unexpected_keys:
+            print(f'Unexpected keys when loading pretrained weights: {unexpected_keys}')
+    
     def forward(self, data):
         """ Compute keypoints, scores, descriptors for image """
         # Shared Encoder
