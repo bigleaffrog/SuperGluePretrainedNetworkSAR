@@ -32,6 +32,100 @@ We provide two pre-trained weights files: an indoor model trained on ScanNet dat
 
 Simply run the following command: `pip3 install numpy opencv-python torch matplotlib`
 
+## Fine-tuning for Sentinel-2 RGB Images (Scheme 3)
+
+This repository supports fine-tuning SuperPoint on Sentinel-2 RGB PNG images (B4/B3/B2 bands) with **automatic channel detection** and **pretrained weight adaptation**.
+
+### Key Features for Scheme 3
+
+* **Automatic Channel Detection**: Input channel count is automatically inferred from the dataset, not hardcoded
+* **Weight Adaptation**: Pretrained 1-channel (grayscale) weights are automatically adapted to work with 3-channel (RGB) inputs
+* **Fine-tuning Support**: Load pretrained weights and fine-tune on new data with configurable layer freezing
+* **RGBA Handling**: Automatically discards alpha channel from PNG files
+* **Backward Compatible**: Existing 1-channel and 13-channel workflows continue to work
+
+### Quick Start - Fine-tuning on RGB PNG Images
+
+1. **Prepare your data**: Place Sentinel-2 RGB PNG images (B4/B3/B2) in a directory:
+   ```
+   data/
+     image_001.png
+     image_002.png
+     ...
+   ```
+
+2. **Run fine-tuning**:
+   ```bash
+   python train_superpoint.py \
+     --image_dir ./data \
+     --batch_size 4 \
+     --epochs 20 \
+     --freeze_backbone \
+     --output_dir ./output
+   ```
+
+   The script will:
+   - Automatically detect input channels (3 for RGB)
+   - Load pretrained SuperPoint weights (1-channel)
+   - Adapt first conv layer weights (1ch → 3ch)
+   - Fine-tune the model with optional layer freezing
+
+3. **Configuration options**:
+   - `--freeze_backbone`: Freeze early conv layers for fine-tuning (recommended)
+   - `--no_pretrained`: Train from scratch instead of fine-tuning
+   - `--learning_rate 0.001`: Set learning rate (auto-reduced when freezing backbone)
+   - `--image_glob '*.png' '*.jpg'`: Specify image file patterns
+
+### Dataset Format
+
+The `S2RGBPNGDataset` class expects:
+- PNG images with 3 channels (RGB) or any other channel count
+- Pixel values: uint8 [0-255] or uint16 [0-65535] (auto-normalized to [0-1])
+- RGBA images are automatically converted to RGB
+
+Example usage:
+```python
+from data import S2RGBPNGDataset
+
+dataset = S2RGBPNGDataset(image_dir='./data')
+print(f"Channels: {dataset.channels}")  # Auto-detected
+print(f"Band mapping: {dataset.band_mapping}")  # 'B4/B3/B2' for 3ch
+```
+
+### Model Configuration
+
+SuperPoint now supports configurable input channels:
+```python
+from models.superpoint import SuperPoint
+
+# Create model with 3 input channels (RGB)
+model = SuperPoint({
+    'in_channels': 3,  # Number of input channels
+    'load_pretrained': True,  # Load and adapt pretrained weights
+    'nms_radius': 4,
+    'keypoint_threshold': 0.005,
+})
+```
+
+The model will automatically:
+1. Load pretrained 1-channel weights
+2. Adapt `conv1a` layer to accept 3 channels
+3. Log any missing/unexpected keys
+
+### Testing
+
+Run the test suite to verify the implementation:
+```bash
+python test_scheme3.py
+```
+
+This validates:
+- Dataset loading with correct channel detection
+- RGBA to RGB conversion
+- Weight adaptation (1ch → 3ch)
+- Model creation with various channel counts
+- Backward compatibility
+
 ## Contents
 There are two main top-level scripts in this repo:
 
