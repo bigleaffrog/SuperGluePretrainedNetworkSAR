@@ -1,3 +1,12 @@
 *.pyc
 *.DS_Store
 *.swp
+# Training outputs
+output/
+checkpoints/
+*.pth
+!models/weights/*.pth
+# Test artifacts
+__pycache__/
+.pytest_cache/
+*.egg-info/
