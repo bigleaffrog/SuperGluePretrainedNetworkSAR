@@ -23,8 +23,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+
+# Try to import tensorboard, but make it optional
+try:
+    from torch.utils.tensorboard import SummaryWriter
+    TENSORBOARD_AVAILABLE = True
+except ImportError:
+    TENSORBOARD_AVAILABLE = False
+    print("Warning: TensorBoard not available. Install with: pip install tensorboard")
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -60,10 +67,12 @@ class SuperGlueTrainer:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize tensorboard
-        if config.get('use_tensorboard', True):
+        if config.get('use_tensorboard', True) and TENSORBOARD_AVAILABLE:
             self.writer = SummaryWriter(log_dir=str(self.log_dir))
         else:
             self.writer = None
+            if config.get('use_tensorboard', True) and not TENSORBOARD_AVAILABLE:
+                print("Warning: TensorBoard requested but not available")
         
         # Build models
         self.build_models()
