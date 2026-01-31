@@ -147,7 +147,20 @@ class SuperPoint(nn.Module):
         print('Loaded SuperPoint model')
 
     def _load_pretrained_weights(self, path):
-        """Load pretrained weights with channel adaptation for first layer."""
+        """Load pretrained weights with channel adaptation for first layer.
+        
+        Weight Adaptation Strategy:
+        - 1→2 channels: Replicates the single channel to both VV and VH
+        - 3→2 channels: Uses first 2 channels (assumes RGB→VV/VH mapping)
+        
+        This simple replication/selection approach is chosen for:
+        1. Simplicity and reproducibility
+        2. Preserving pretrained feature statistics
+        3. Avoiding additional trainable parameters
+        
+        Alternative approaches (averaging, learned adaptation) could be explored
+        but would require more careful initialization and validation.
+        """
         pretrained_dict = torch.load(str(path))
         model_dict = self.state_dict()
         

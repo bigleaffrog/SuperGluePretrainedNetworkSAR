@@ -2,6 +2,15 @@
 
 This guide explains how to train SuperGlue with Sentinel-1 SAR (VV+VH dual-channel) and Sentinel-2 optical data for improved SAR↔SAR matching performance.
 
+## ⚠️ Important Note on Loss Implementation
+
+**The current implementation uses a simplified loss computation** in the training loop. For production use, the loss function should be enhanced to:
+1. Use the full assignment matrix from SuperGlue's log_optimal_transport
+2. Compute cross-entropy loss on the assignment matrix with ground truth matches
+3. Include both SuperGlue matching loss and optional SuperPoint detector/descriptor losses
+
+The current implementation provides the infrastructure and can run training, but the loss computation in `train/train_utils.py` should be improved for optimal results. See the "Advanced Topics" section for details.
+
 ## Overview
 
 The training implementation supports:
@@ -309,6 +318,47 @@ If you run out of GPU memory:
 4. Verify images have correct number of channels
 
 ## Advanced Topics
+
+### Improving the Loss Function
+
+**IMPORTANT**: The current loss implementation in `train/train_utils.py` is simplified and should be enhanced for production training.
+
+To improve training effectiveness, modify the `SuperGlue.forward()` method to return the assignment matrix scores before thresholding, then use these in the loss computation:
+
+```python
+# In models/superglue.py, modify forward() to optionally return scores
+def forward(self, data, return_scores=False):
+    # ... existing code ...
+    
+    # Run the optimal transport
+    scores = log_optimal_transport(
+        scores, self.bin_score,
+        iters=self.config['sinkhorn_iterations'])
+    
+    if return_scores:
+        # Return scores for training
+        return {
+            'scores': scores,  # (B, M+1, N+1) assignment matrix
+            # ... other outputs ...
+        }
+    
+    # ... rest of existing code for inference ...
+```
+
+Then in training loop, compute proper loss:
+
+```python
+# In train_superglue_sar.py
+pred = self.superglue(data, return_scores=True)
+scores = pred['scores']  # (B, M+1, N+1)
+
+# Compute cross-entropy loss
+loss = compute_superglue_loss_from_scores(
+    scores, gt_matches0_batch, gt_matches1_batch, self.device
+)
+```
+
+The provided `compute_superglue_loss_from_scores` function in `train_utils.py` shows the structure for this computation.
 
 ### Custom Loss Functions
 

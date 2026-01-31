@@ -221,7 +221,12 @@ class SuperGlueTrainer:
             self.optimizer_sp = None
     
     def train_epoch(self, epoch):
-        """Train for one epoch"""
+        """Train for one epoch
+        
+        NOTE: The current loss computation is simplified and returns a placeholder.
+        For effective training, the loss function should be enhanced to use the
+        full assignment matrix from SuperGlue. See TRAINING.md for details.
+        """
         self.superglue.train()
         if self.config['training_stage'] == 2:
             self.superpoint.train()

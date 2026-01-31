@@ -60,6 +60,15 @@ def generate_ground_truth_matches(kpts0, kpts1, T_0to1, pixel_threshold=3.0):
 def compute_superglue_loss(pred, kpts0, kpts1, T_0to1, pixel_threshold=3.0):
     """Compute SuperGlue loss based on geometric consistency
     
+    NOTE: This is a simplified implementation that computes accuracy but returns
+    a placeholder loss. For production training, this should be enhanced to:
+    1. Access the assignment matrix from SuperGlue's log_optimal_transport
+    2. Compute cross-entropy loss on the assignment with ground truth
+    3. Properly backpropagate through the full matching pipeline
+    
+    To use this effectively, modify SuperGlue.forward() to return the scores
+    matrix and use compute_superglue_loss_from_scores() instead.
+    
     Args:
         pred: Predictions from SuperGlue model containing 'scores' or matching matrices
         kpts0: Keypoints from image0, list or tensor
@@ -68,7 +77,7 @@ def compute_superglue_loss(pred, kpts0, kpts1, T_0to1, pixel_threshold=3.0):
         pixel_threshold: Pixel threshold for valid matches
     
     Returns:
-        loss: Scalar loss value
+        loss: Scalar loss value (PLACEHOLDER - currently returns 0)
         stats: Dictionary with loss statistics
     """
     batch_size = T_0to1.shape[0]
