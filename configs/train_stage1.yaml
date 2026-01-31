@@ -1,0 +1,54 @@
+# Stage 1 Training Configuration: Train SuperGlue only (frozen SuperPoint)
+# This stage focuses on adapting SuperGlue to SAR data while keeping SuperPoint frozen
+
+# Training stage (1 = freeze SuperPoint, 2 = joint fine-tuning)
+training_stage: 1
+
+# Data configuration
+data_root: ./data/sentinel_pairs
+train_csv: train_pairs.csv
+val_csv: val_pairs.csv  # Optional
+
+# Patch and pair settings
+patch_size: [480, 480]
+pair_ratios:
+  sar_sar: 0.6    # 60% SAR↔SAR pairs with geometric augmentation
+  sar_s2: 0.4     # 40% SAR↔S2 aligned pairs
+  s2_s2: 0.0      # 0% S2↔S2 pairs
+num_pairs_per_scene: 10
+
+# SAR preprocessing
+sar_log_transform: true
+sar_percentile_clip: [2, 98]  # Robust normalization percentiles
+augment_sar: true
+
+# Model configuration
+in_channels: 2  # VV + VH for SAR
+pretrained_weights: indoor  # or 'outdoor'
+max_keypoints: 1024  # Can be 1024 or 2048
+nms_radius: 4
+keypoint_threshold: 0.005
+
+# Training hyperparameters
+batch_size: 4
+num_epochs: 30
+lr_superglue: 1.0e-4
+weight_decay: 0.0
+
+# Loss configuration
+pixel_threshold: 3.0  # Pixel threshold for valid matches
+
+# Training settings
+num_workers: 4
+seed: 42
+save_interval: 5  # Save checkpoint every N epochs
+
+# Output
+output_dir: ./output/stage1_training
+use_tensorboard: true
+
+# Optional: Learning rate scheduler
+# lr_scheduler:
+#   type: step
+#   step_size: 10
+#   gamma: 0.5

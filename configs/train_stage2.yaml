@@ -1,0 +1,56 @@
+# Stage 2 Training Configuration: Joint fine-tuning (unfrozen SuperPoint + SuperGlue)
+# This stage fine-tunes both SuperPoint and SuperGlue together with smaller learning rate for SuperPoint
+
+# Training stage (1 = freeze SuperPoint, 2 = joint fine-tuning)
+training_stage: 2
+
+# Unfreezing strategy for SuperPoint
+# Options: 'all', 'descriptor', 'last_layers'
+unfreeze_strategy: last_layers
+
+# Data configuration
+data_root: ./data/sentinel_pairs
+train_csv: train_pairs.csv
+val_csv: val_pairs.csv  # Optional
+
+# Patch and pair settings
+patch_size: [480, 480]
+pair_ratios:
+  sar_sar: 0.7    # More SAR↔SAR pairs for stage 2
+  sar_s2: 0.3
+  s2_s2: 0.0
+num_pairs_per_scene: 10
+
+# SAR preprocessing
+sar_log_transform: true
+sar_percentile_clip: [2, 98]
+augment_sar: true
+
+# Model configuration
+in_channels: 2  # VV + VH for SAR
+pretrained_weights: indoor  # or 'outdoor'
+max_keypoints: 1024  # Can be 1024 or 2048
+nms_radius: 4
+keypoint_threshold: 0.005
+
+# Training hyperparameters
+batch_size: 4
+num_epochs: 20  # Fewer epochs for fine-tuning
+lr_superglue: 5.0e-5  # Smaller learning rate for stage 2
+lr_superpoint: 1.0e-5  # Even smaller for SuperPoint fine-tuning
+weight_decay: 0.0
+
+# Loss configuration
+pixel_threshold: 3.0
+
+# Training settings
+num_workers: 4
+seed: 42
+save_interval: 5
+
+# Output
+output_dir: ./output/stage2_training
+use_tensorboard: true
+
+# Note: To start stage 2, use --resume with the checkpoint from stage 1
+# Example: python train/train_superglue_sar.py --config configs/train_stage2.yaml --resume output/stage1_training/checkpoints/final_model.pth
