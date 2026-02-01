@@ -39,17 +39,34 @@ sys.path.append(str(Path(__file__).parent.parent))
 from models.superpoint import SuperPoint
 from models.superglue import SuperGlue
 from datasets import SentinelPairDataset
-from train.train_utils import (
-    generate_ground_truth_matches,
-    compute_superglue_loss_from_scores,
-    freeze_model,
-    unfreeze_model,
-    freeze_layers,
-    unfreeze_layers,
-    get_trainable_params,
-    save_checkpoint,
-    load_checkpoint
-)
+
+# Use relative import for train_utils since it's in the same package
+try:
+    # Try relative import first (when running as module)
+    from .train_utils import (
+        generate_ground_truth_matches,
+        compute_superglue_loss_from_scores,
+        freeze_model,
+        unfreeze_model,
+        freeze_layers,
+        unfreeze_layers,
+        get_trainable_params,
+        save_checkpoint,
+        load_checkpoint
+    )
+except ImportError:
+    # Fall back to direct import (when running as script)
+    from train_utils import (
+        generate_ground_truth_matches,
+        compute_superglue_loss_from_scores,
+        freeze_model,
+        unfreeze_model,
+        freeze_layers,
+        unfreeze_layers,
+        get_trainable_params,
+        save_checkpoint,
+        load_checkpoint
+    )
 
 
 class SuperGlueTrainer:
