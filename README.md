@@ -23,6 +23,18 @@ SuperGlue operates as a "middle-end," performing context aggregation, matching, 
 
 We provide two pre-trained weights files: an indoor model trained on ScanNet data, and an outdoor model trained on MegaDepth data. Both models are inside the [weights directory](./models/weights). By default, the demo will run the **indoor** model.
 
+## NEW: Training for SAR Image Matching
+
+This repository now includes **training capabilities** for adapting SuperGlue to **Sentinel-1 SAR (VV+VH dual-channel)** data:
+
+- ✨ **2-channel SuperPoint** support for SAR VV+VH input
+- 🎯 **Two-stage training**: Freeze SuperPoint → Joint fine-tuning
+- 🔄 **Pretrained weight adaptation** from 1/3-channel to 2-channel (non-random initialization)
+- 📊 **Three types of training pairs**: SAR↔SAR, SAR↔S2, S2↔S2
+- 🎲 **Geometric augmentation** with accurate homography for SAR↔SAR
+
+**See [TRAINING.md](TRAINING.md) for complete training guide and usage instructions.**
+
 ## Dependencies
 * Python 3 >= 3.5
 * PyTorch >= 1.1
@@ -32,11 +44,14 @@ We provide two pre-trained weights files: an indoor model trained on ScanNet dat
 
 Simply run the following command: `pip3 install numpy opencv-python torch matplotlib`
 
+For training, additional dependencies are required: `pip3 install pyyaml tensorboard tqdm`
+
 ## Contents
 There are two main top-level scripts in this repo:
 
 1. `demo_superglue.py` : runs a live demo on a webcam, IP camera, image directory or movie file
 2. `match_pairs.py`: reads image pairs from files and dumps matches to disk (also runs evaluation if ground truth relative poses are provided)
+3. **NEW:** `train/train_superglue_sar.py`: training script for SAR data (see [TRAINING.md](TRAINING.md))
 
 ## Live Matching Demo Script (`demo_superglue.py`)
 This demo runs SuperPoint + SuperGlue feature matching on an anchor image and live image. You can update the anchor image by pressing the `n` key. The demo can read image streams from a USB or IP camera, a directory containing images, or a video file. You can pass all of these inputs using the `--input` flag.

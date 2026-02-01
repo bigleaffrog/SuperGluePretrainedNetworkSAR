@@ -1,3 +1,30 @@
 *.pyc
 *.DS_Store
 *.swp
+
+# Training outputs
+output/
+checkpoints/
+logs/
+*.pth
+!models/weights/*.pth
+
+# Data directories (user should provide their own)
+data/
+
+# Temporary files
+/tmp/
+*.tmp
+
+# TensorBoard
+events.out.tfevents.*
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/

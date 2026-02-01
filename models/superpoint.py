@@ -106,6 +106,8 @@ class SuperPoint(nn.Module):
         'keypoint_threshold': 0.005,
         'max_keypoints': -1,
         'remove_borders': 4,
+        'in_channels': 1,  # Support 1, 2, or 3 channels
+        'load_pretrained': True,  # Whether to load pretrained weights
     }
 
     def __init__(self, config):
@@ -116,7 +118,8 @@ class SuperPoint(nn.Module):
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         c1, c2, c3, c4, c5 = 64, 64, 128, 128, 256
 
-        self.conv1a = nn.Conv2d(1, c1, kernel_size=3, stride=1, padding=1)
+        in_channels = self.config['in_channels']
+        self.conv1a = nn.Conv2d(in_channels, c1, kernel_size=3, stride=1, padding=1)
         self.conv1b = nn.Conv2d(c1, c1, kernel_size=3, stride=1, padding=1)
         self.conv2a = nn.Conv2d(c1, c2, kernel_size=3, stride=1, padding=1)
         self.conv2b = nn.Conv2d(c2, c2, kernel_size=3, stride=1, padding=1)
@@ -133,14 +136,69 @@ class SuperPoint(nn.Module):
             c5, self.config['descriptor_dim'],
             kernel_size=1, stride=1, padding=0)
 
-        path = Path(__file__).parent / 'weights/superpoint_v1.pth'
-        self.load_state_dict(torch.load(str(path)))
+        if self.config['load_pretrained']:
+            path = Path(__file__).parent / 'weights/superpoint_v1.pth'
+            self._load_pretrained_weights(path)
 
         mk = self.config['max_keypoints']
         if mk == 0 or mk < -1:
             raise ValueError('\"max_keypoints\" must be positive or \"-1\"')
 
         print('Loaded SuperPoint model')
+
+    def _load_pretrained_weights(self, path):
+        """Load pretrained weights with channel adaptation for first layer.
+        
+        Weight Adaptation Strategy:
+        - 1→2 channels: Replicates the single channel to both VV and VH
+        - 3→2 channels: Uses first 2 channels (assumes RGB→VV/VH mapping)
+        
+        This simple replication/selection approach is chosen for:
+        1. Simplicity and reproducibility
+        2. Preserving pretrained feature statistics
+        3. Avoiding additional trainable parameters
+        
+        Alternative approaches (averaging, learned adaptation) could be explored
+        but would require more careful initialization and validation.
+        """
+        pretrained_dict = torch.load(str(path))
+        model_dict = self.state_dict()
+        
+        in_channels = self.config['in_channels']
+        
+        # Handle first layer (conv1a) weight adaptation
+        if 'conv1a.weight' in pretrained_dict:
+            pretrained_conv1a = pretrained_dict['conv1a.weight']  # Shape: [64, C_pretrained, 3, 3]
+            pretrained_channels = pretrained_conv1a.shape[1]
+            
+            if in_channels != pretrained_channels:
+                # Need to adapt the first layer weights
+                if in_channels == 2 and pretrained_channels in [1, 3]:
+                    # For 2-channel input from 1 or 3-channel pretrained
+                    if pretrained_channels == 1:
+                        # Replicate single channel to 2 channels
+                        adapted_weight = pretrained_conv1a.repeat(1, 2, 1, 1)
+                    else:  # pretrained_channels == 3
+                        # Average RGB channels for 2-channel SAR (VV, VH)
+                        adapted_weight = pretrained_conv1a[:, :2, :, :]
+                    pretrained_dict['conv1a.weight'] = adapted_weight
+                    print(f'Adapted conv1a weights from {pretrained_channels} to {in_channels} channels')
+                elif in_channels == 3 and pretrained_channels == 1:
+                    # Replicate single channel to 3 channels
+                    adapted_weight = pretrained_conv1a.repeat(1, 3, 1, 1)
+                    pretrained_dict['conv1a.weight'] = adapted_weight
+                    print(f'Adapted conv1a weights from {pretrained_channels} to {in_channels} channels')
+                else:
+                    print(f'Warning: Cannot adapt from {pretrained_channels} to {in_channels} channels. '
+                          'First layer will use random initialization.')
+                    # Don't load conv1a.weight
+                    pretrained_dict.pop('conv1a.weight')
+                    if 'conv1a.bias' in pretrained_dict:
+                        pretrained_dict.pop('conv1a.bias')
+        
+        # Load all compatible weights
+        model_dict.update({k: v for k, v in pretrained_dict.items() if k in model_dict})
+        self.load_state_dict(model_dict)
 
     def forward(self, data):
         """ Compute keypoints, scores, descriptors for image """
