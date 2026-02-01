@@ -287,6 +287,45 @@ with torch.no_grad():
 # ... (similar preprocessing for image2)
 ```
 
+## Testing Trained Models
+
+After training, you can test and evaluate your models using the `train/test.py` script:
+
+### Basic Testing
+
+Test your trained model on SAR image pairs:
+
+```bash
+python train/test.py \
+    --checkpoint output/stage2_training/checkpoints/final_model.pth \
+    --image0_vv data/test/scene1/vv.tif \
+    --image0_vh data/test/scene1/vh.tif \
+    --image1_vv data/test/scene2/vv.tif \
+    --image1_vh data/test/scene2/vh.tif
+```
+
+### Evaluation with Ground Truth
+
+If you have ground truth homography for evaluation:
+
+```bash
+python train/test.py \
+    --checkpoint model.pth \
+    --eval \
+    --gt_homography ground_truth/homography.npy \
+    --image0_vv vv0.tif --image0_vh vh0.tif \
+    --image1_vv vv1.tif --image1_vh vh1.tif \
+    --threshold 3.0
+```
+
+The test script will output:
+- Number of keypoints detected
+- Number of matches found
+- Average match confidence
+- Matching accuracy (if ground truth provided)
+
+See [train/README_TEST.md](train/README_TEST.md) for detailed testing documentation.
+
 ## Troubleshooting
 
 ### GPU Memory Issues
